@@ -4,9 +4,10 @@ const os = require("os");
 const fs = require("fs");
 
 const LIBREOFFICE_PATH = process.env.LIBREOFFICE_PATH;
+const PDF_CAIRO_PATH = process.env.PDF_CAIRO_PATH;
 
 module.exports = async (filepath, outdir, convertTo, numAttempts) => {
-  const commands = [
+  let commands = [
     LIBREOFFICE_PATH,
 
     // Without this, LibreOffice will return 'Fatal Error: The application
@@ -33,12 +34,34 @@ module.exports = async (filepath, outdir, convertTo, numAttempts) => {
     filepath,
   ];
 
-  const expectedOutpath = filepath.replace(
+  // If the convert_to is jpeg, the extension should be jpg (because pdfcairo only exports to jpg)
+  let expectedOutpath = filepath.replace(
     path.extname(filepath),
-    `.${convertTo}`
+    `.${["jpeg", "jpg"].includes(convertTo) ? "jpg" : convertTo}`
   );
 
-  console.info(`\n\nas\n\n`);
+  // only supporting pdf to jpg/png/jpeg for now
+  if (["jpg", "png", "jpeg"].includes(convertTo)) {
+    const pdfcairoArgs = [
+      `${PDF_CAIRO_PATH}/pdftocairo`,
+      // "-f",
+      // "1",
+      // "-l",
+      // "1",
+      // "-scale-to-fit",
+      // "-scale-to-x",
+      // "1280",
+      // "-jpeg",
+      `-${convertTo}`,
+      "-singlefile",
+      "-scale-to",
+      "1280",
+      filepath,
+      expectedOutpath.split(".")[0],
+    ];
+    commands = pdfcairoArgs;
+  }
+
   // On a cold start, LibreOffice often requires several attempts to convert
   // a file before it succeeds
   for (let attempt = 0; attempt < numAttempts; attempt++) {
@@ -53,6 +76,15 @@ module.exports = async (filepath, outdir, convertTo, numAttempts) => {
 
       child.stderr.on("data", (data) => {
         stderr += data.toString();
+
+        /**
+         * If the error message indicates that the file could not be loaded,
+         * then the chances are that Document is password protected. In this
+         * case, we should not retry the conversion.
+         */
+        if (stderr.includes("source file could not be loaded")) {
+          attempt = 1000;
+        }
       });
 
       child.on("close", (status) => {
@@ -60,6 +92,7 @@ module.exports = async (filepath, outdir, convertTo, numAttempts) => {
       });
     });
 
+    // If the conversion was successful, return the path to the converted file
     if (status === 0 && fs.existsSync(expectedOutpath)) {
       console.info(
         `Conversion successful on attempt ${
@@ -99,7 +132,9 @@ module.exports = async (filepath, outdir, convertTo, numAttempts) => {
     });
 
     throw new Error(
-      `Unable to convert file. On the last attempt (${numAttempts}/${numAttempts}) the output was as follows - stdout: "${stdout}". stderr: "${stderr}".`
+      stderr.includes("source file could not be loaded")
+        ? "You cannot share password protected documents on LinkedIn."
+        : "We encountered some error. Please try again!"
     );
   }
 };

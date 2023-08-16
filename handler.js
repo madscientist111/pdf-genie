@@ -2,6 +2,7 @@ const downloadMedia = require("./downloadAndSaveFile.js");
 const convertFile = require("./convert.js");
 const { uploadThumbnails } = require("./uploadToS3");
 const jwt = require("./jwtValidation");
+const path = require("path");
 
 const DEFAULT_ATTEMPTS = process.env.DEFAULT_ATTEMPTS || 3;
 
@@ -35,86 +36,103 @@ const DEFAULT_ATTEMPTS = process.env.DEFAULT_ATTEMPTS || 3;
  * @returns {Object} - the S3 URL of the converted file
  */
 module.exports.handler = async (event) => {
-  if (!event.body || !event.headers) {
-    return {
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Credentials": true,
-        "Access-Control-Allow-Methods": "POST,GET,OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type,Authorization",
-      },
-      statusCode: 401,
-      body: JSON.stringify({
-        status: 401,
-        message: "Invalid Body. Please check the request body and try again.",
-      }),
-    };
-  }
+  try {
+    if (!event.body || !event.headers) {
+      return {
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Credentials": true,
+          "Access-Control-Allow-Methods": "POST,GET,OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type,Authorization",
+        },
+        statusCode: 401,
+        body: JSON.stringify({
+          status: 401,
+          message: "Invalid Body. Please check the request body and try again.",
+        }),
+      };
+    }
 
-  // Check if the request is authorized
-  const checkToken = await jwt.validateJWT(event);
-  if (!(checkToken && checkToken.companyId)) {
-    return {
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Credentials": true,
-        "Access-Control-Allow-Methods": "POST,GET,OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type,Authorization",
-      },
-      statusCode: 401,
-      body: JSON.stringify({
-        status: 401,
-        message: "Authentication Error",
-      }),
-    };
-  }
+    // Check if the request is authorized
+    const checkToken = await jwt.validateJWT(event);
+    if (!(checkToken && checkToken.companyId)) {
+      return {
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Credentials": true,
+          "Access-Control-Allow-Methods": "POST,GET,OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type,Authorization",
+        },
+        statusCode: 401,
+        body: JSON.stringify({
+          status: 401,
+          message: "Authentication Error",
+        }),
+      };
+    }
 
-  const mediaUrl = event.body.media_url;
-  const numAttempts = event.body.num_attempts || DEFAULT_ATTEMPTS;
-  const convertTo = event.body.convert_to || "pdf";
+    const mediaUrl = event.body.media_url;
+    const numAttempts = event.body.num_attempts || DEFAULT_ATTEMPTS;
+    const convertTo = event.body.convert_to || "pdf";
 
-  // If 'convert_to' is specified in `event` then use that. Otherwise,
-  // attempt to infer it from `output_path`
+    // If 'convert_to' is specified in `event` then use that. Otherwise,
+    // attempt to infer it from `output_path`
 
-  const supportedTargetTypes = ["pdf"];
-  // [("pdf", "png", "jpg", "jpeg")];
+    const supportedTargetTypes = ["pdf"];
+    // [("pdf", "png", "jpg", "jpeg")];
 
-  if (!mediaUrl) {
-    throw new Error(`Please specify a media_url to convert.`);
-  }
+    if (!mediaUrl) {
+      throw new Error(`Please specify a media_url to convert.`);
+    }
 
-  if (!supportedTargetTypes.includes(convertTo)) {
-    throw new Error(
-      `We do not support the submitted Target file type - "${convertTo}". Check back later.`
+    if (!supportedTargetTypes.includes(convertTo)) {
+      throw new Error(
+        `We do not support the submitted Target file type - "${convertTo}". Check back later.`
+      );
+    }
+
+    const downloadPath = await downloadMedia(mediaUrl, "/tmp");
+
+    console.info(
+      `Successfully downloaded\n::->> ${mediaUrl} - at\n::->>${downloadPath}.`
     );
+
+    // Convert to PDF only if the file is not already a PDF
+    const uploadPath = downloadPath.includes(".pdf")
+      ? downloadPath
+      : await convertFile(downloadPath, "/tmp", convertTo, numAttempts);
+
+    // TODO: convert all the pages of PDF to images
+    // the param can not be jpg, it only supports jpeg
+    const imgPath = await convertFile(uploadPath, "/tmp", "jpeg", numAttempts);
+
+    // upload the converted pdf file to S3
+    const pdfLink = await uploadThumbnails([uploadPath], checkToken.companyId);
+
+    // upload the converted image files to S3
+    const imgLinks = await uploadThumbnails(
+      [imgPath],
+      checkToken.companyId,
+      path.extname(imgPath).replace(".", "")
+    );
+
+    console.info(
+      `Successfully uploaded converted document to "${pdfLink} and ${imgLinks}".`
+    );
+
+    return {
+      statusCode: 200,
+      body: {
+        pdfLink,
+        imageLinks: imgLinks,
+      },
+    };
+  } catch (err) {
+    console.log("errrrr");
+    console.log(err);
+    return {
+      statusCode: 400,
+      errorMessage: err.message,
+    };
   }
-
-  const downloadPath = await downloadMedia(mediaUrl, "/tmp");
-
-  console.info(
-    `Successfully downloaded\n::->> ${mediaUrl} - at\n::->>${downloadPath}.`
-  );
-
-  const uploadPath = await convertFile(
-    downloadPath,
-    "/tmp",
-    convertTo,
-    numAttempts
-  );
-
-  const s3UploadLink = await uploadThumbnails(
-    [uploadPath],
-    checkToken.companyId
-  );
-
-  console.info(
-    `Successfully uploaded converted document to "${s3UploadLink}".`
-  );
-
-  return {
-    statusCode: 200,
-    body: JSON.stringify({ s3UploadLink }),
-    // conversion,
-    // ls: ji,
-  };
 };

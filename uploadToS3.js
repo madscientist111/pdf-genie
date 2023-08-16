@@ -3,6 +3,7 @@ const aws = require("aws-sdk");
 const shortid = require("shortid");
 const envVariable = require("./config");
 const s3Stream = require("s3-upload-stream");
+const mimetype = require("mime-types");
 
 const s3 = new aws.S3({
   apiVersion: "2006-03-01",
@@ -11,17 +12,19 @@ const s3 = new aws.S3({
   secretAccessKey: envVariable.secretKey,
 });
 
-const upload = async (thumbnail, companyId) =>
+const upload = async (thumbnail, companyId, customExt = "") =>
   new Promise((resolve, reject) => {
-    const key = `${Date.now()}-${shortid.generate()}.pdf`;
+    // Allow uploading of files with custom extensions
+    const key = `${Date.now()}-${shortid.generate()}.${customExt || "pdf"}`;
     const media = fs.createReadStream(thumbnail);
+    const contentType = mimetype.lookup(thumbnail);
 
     const upload = s3Stream(s3).upload({
       Bucket: envVariable.bucketName,
       Key: `${companyId}/${key}`,
       ACL: "public-read",
       StorageClass: "REDUCED_REDUNDANCY",
-      ContentType: "application/pdf",
+      ContentType: contentType,
     });
     media.pipe(upload);
 
@@ -53,9 +56,9 @@ const upload = async (thumbnail, companyId) =>
     });
   });
 
-const uploadThumbnails = async (thumbnails, companyId) => {
+const uploadThumbnails = async (thumbnails, companyId, customExt = "") => {
   const thumbnailUrls = await Promise.all(
-    thumbnails.map((thumbnail) => upload(thumbnail, companyId))
+    thumbnails.map((thumbnail) => upload(thumbnail, companyId, customExt))
   );
   return thumbnailUrls;
 };
