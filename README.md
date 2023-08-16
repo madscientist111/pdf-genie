@@ -4,6 +4,12 @@ Docker image-based AWS Lambda function in Node.js that converts any document for
 
 based on [javidlakha/unofuction](https://github.com/javidlakha/unofunction).
 
+<div style="text-align:center;">
+    <img src="https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/40338822-69bc-4fb6-9bc4-b87553f4542d/df9hyf9-d9fb64e1-5c58-46b8-94db-baed525ea10a.jpg/v1/fill/w_1280,h_1111,q_75,strp/30th_anniversary_of_aladdin_by_brazilianferalcat_df9hyf9-fullview.jpg?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOjdlMGQxODg5ODIyNjQzNzNhNWYwZDQxNWVhMGQyNmUwIiwiaXNzIjoidXJuOmFwcDo3ZTBkMTg4OTgyMjY0MzczYTVmMGQ0MTVlYTBkMjZlMCIsIm9iaiI6W1t7ImhlaWdodCI6Ijw9MTExMSIsInBhdGgiOiJcL2ZcLzQwMzM4ODIyLTY5YmMtNGZiNi05YmM0LWI4NzU1M2Y0NTQyZFwvZGY5aHlmOS1kOWZiNjRlMS01YzU4LTQ2YjgtOTRkYi1iYWVkNTI1ZWExMGEuanBnIiwid2lkdGgiOiI8PTEyODAifV1dLCJhdWQiOlsidXJuOnNlcnZpY2U6aW1hZ2Uub3BlcmF0aW9ucyJdfQ.Y5156TNDx3ceVL7YAIOpQCcTVpMp2KQsS1jcDYwFtsE" width="300" height="auto" />
+    <p>Artwork by <a href="https://www.deviantart.com/brazilianferalcat/art/30th-Anniversary-of-Aladdin-922946949">brazilianferalcat</a></p>
+</div>
+
+
 ## Deployment at AWS
 * Create a new repositery
 * Go to view push commands
