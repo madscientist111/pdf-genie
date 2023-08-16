@@ -129,7 +129,9 @@ module.exports.handler = async (event) => {
     const imgPath = await convertFile(uploadPath, "/tmp", "jpeg", numAttempts);
 
     // upload the converted pdf file to S3
-    const pdfLink = await uploadThumbnails([uploadPath], checkToken.companyId);
+    const pdfLink = downloadPath.includes(".pdf")
+      ? mediaUrl
+      : await uploadThumbnails([uploadPath], checkToken.companyId);
 
     // upload the converted image files to S3
     const imgLinks = await uploadThumbnails(
