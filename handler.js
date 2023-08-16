@@ -6,6 +6,23 @@ const path = require("path");
 
 const DEFAULT_ATTEMPTS = process.env.DEFAULT_ATTEMPTS || 3;
 
+const getErrorResponse = (statusCode = 0, errorMessage = "") => ({
+  statusCode: statusCode || 400,
+  headers: {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Credentials": true,
+    "Access-Control-Allow-Methods": "POST,GET,OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type,Authorization",
+  },
+  body: JSON.stringify({
+    status: statusCode || 400,
+    message: "Validation Failed",
+    reasons: [
+      { message: errorMessage || "We encountered an error. Please try again!" },
+    ],
+  }),
+});
+
 /**
  * Handles file download, conversion and upload
  *
@@ -37,43 +54,46 @@ const DEFAULT_ATTEMPTS = process.env.DEFAULT_ATTEMPTS || 3;
  */
 module.exports.handler = async (event) => {
   try {
-    if (!event.body || !event.headers) {
-      return {
-        headers: {
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Credentials": true,
-          "Access-Control-Allow-Methods": "POST,GET,OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type,Authorization",
-        },
-        statusCode: 401,
-        body: JSON.stringify({
-          status: 401,
-          message: "Invalid Body. Please check the request body and try again.",
-        }),
-      };
+    console.log("event", event);
+    // Set the response headers
+    // need to set the headers for AWS API Gateway
+    // also applies to rest of the objects like this
+    const response = {
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Credentials": true,
+        "Access-Control-Allow-Methods": "POST,GET,OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type,Authorization",
+      },
+    };
+
+    if (!event.body) {
+      return getErrorResponse(
+        400,
+        "Invalid Body. Please check the request body and try again."
+      );
+    }
+
+    let body = {};
+
+    try {
+      body = JSON.parse(event.body);
+    } catch (err) {
+      return getErrorResponse(
+        400,
+        "Invalid Body. Please check the request body and try again."
+      );
     }
 
     // Check if the request is authorized
     const checkToken = await jwt.validateJWT(event);
     if (!(checkToken && checkToken.companyId)) {
-      return {
-        headers: {
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Credentials": true,
-          "Access-Control-Allow-Methods": "POST,GET,OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type,Authorization",
-        },
-        statusCode: 401,
-        body: JSON.stringify({
-          status: 401,
-          message: "Authentication Error",
-        }),
-      };
+      return getErrorResponse(401, "Authentication Error");
     }
 
-    const mediaUrl = event.body.media_url;
-    const numAttempts = event.body.num_attempts || DEFAULT_ATTEMPTS;
-    const convertTo = event.body.convert_to || "pdf";
+    const mediaUrl = body.media_url;
+    const numAttempts = body.num_attempts || DEFAULT_ATTEMPTS;
+    const convertTo = body.convert_to || "pdf";
 
     // If 'convert_to' is specified in `event` then use that. Otherwise,
     // attempt to infer it from `output_path`
@@ -82,11 +102,13 @@ module.exports.handler = async (event) => {
     // [("pdf", "png", "jpg", "jpeg")];
 
     if (!mediaUrl) {
-      throw new Error(`Please specify a media_url to convert.`);
+      return getErrorResponse(400, "Please specify a media_url to convert");
+      // throw new Error(`Please specify a media_url to convert.`);
     }
 
     if (!supportedTargetTypes.includes(convertTo)) {
-      throw new Error(
+      return getErrorResponse(
+        400,
         `We do not support the submitted Target file type - "${convertTo}". Check back later.`
       );
     }
@@ -121,18 +143,16 @@ module.exports.handler = async (event) => {
     );
 
     return {
+      ...response,
       statusCode: 200,
-      body: {
+      body: JSON.stringify({
         pdfLink,
         imageLinks: imgLinks,
-      },
+      }),
     };
   } catch (err) {
     console.log("errrrr");
     console.log(err);
-    return {
-      statusCode: 400,
-      errorMessage: err.message,
-    };
+    return getErrorResponse(400, err.message);
   }
 };
