@@ -18,7 +18,7 @@ based on [javidlakha/unofuction](https://github.com/javidlakha/unofunction).
 Check out this detailed and very easy to follow [article](https://www.freecodecamp.org/news/build-and-push-docker-images-to-aws-ecr/) for step by step tutorial!
 
 ## How to run locally
-* To run this, you will need to Docker installed.
+* Ensure [Docker](https://www.docker.com/) is installed on your system.
 
 1. Building the image
 ```
