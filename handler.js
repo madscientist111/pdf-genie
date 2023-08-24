@@ -1,5 +1,6 @@
 const downloadMedia = require("./downloadAndSaveFile.js");
 const convertFile = require("./convert.js");
+const { getPdfMetadata } = require("./convert.js");
 const { uploadThumbnails } = require("./uploadToS3");
 const jwt = require("./jwtValidation");
 const path = require("path");
@@ -119,19 +120,32 @@ module.exports.handler = async (event) => {
       `Successfully downloaded\n::->> ${mediaUrl} - at\n::->>${downloadPath}.`
     );
 
-    // Convert to PDF only if the file is not already a PDF
-    const uploadPath = downloadPath.includes(".pdf")
+    let metaData = {};
+
+    const convertedPdfPath = downloadPath.includes(".pdf")
       ? downloadPath
       : await convertFile(downloadPath, "/tmp", convertTo, numAttempts);
 
+    try {
+      metaData = await getPdfMetadata(convertedPdfPath);
+    } catch (er) {
+      // ignore
+      console.log("Error While Fetching Metadata", er);
+    }
+
     // TODO: convert all the pages of PDF to images
     // the param can not be jpg, it only supports jpeg
-    const imgPath = await convertFile(uploadPath, "/tmp", "jpeg", numAttempts);
+    const imgPath = await convertFile(
+      convertedPdfPath,
+      "/tmp",
+      "jpeg",
+      numAttempts
+    );
 
     // upload the converted pdf file to S3
     const pdfLink = downloadPath.includes(".pdf")
       ? mediaUrl
-      : await uploadThumbnails([uploadPath], checkToken.companyId);
+      : await uploadThumbnails([convertedPdfPath], checkToken.companyId);
 
     // upload the converted image files to S3
     const imgLinks = await uploadThumbnails(
@@ -148,6 +162,7 @@ module.exports.handler = async (event) => {
       ...response,
       statusCode: 200,
       body: JSON.stringify({
+        metaData,
         pdfLink,
         imageLinks: imgLinks,
       }),

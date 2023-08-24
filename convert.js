@@ -138,3 +138,40 @@ module.exports = async (filepath, outdir, convertTo, numAttempts) => {
     );
   }
 };
+
+// function to get the pdf metadata
+module.exports.getPdfMetadata = async (filepath) => {
+  const dataObj = {};
+  let commands = [`${PDF_CAIRO_PATH}/pdfinfo`, filepath];
+
+  const { stdout, stderr, status } = await new Promise((resolve) => {
+    const child = spawn(commands[0], commands.slice(1));
+    let stdout = "";
+    let stderr = "";
+
+    child.stdout.on("data", (data) => {
+      stdout += data.toString();
+    });
+
+    child.stderr.on("data", (data) => {
+      stderr += data.toString();
+    });
+
+    child.on("close", (status) => {
+      resolve({ stdout, stderr, status });
+    });
+  });
+
+  if (status === 0) {
+    stdout.split("\n").forEach((str) => {
+      const strArr = str.split(":").map((s) => (s && s.trim()) || "");
+      dataObj[strArr[0].toLowerCase()] = strArr[1];
+    });
+
+    console.log("dataObj received: success");
+  } else {
+    throw new Error(`Error executing the command. Exit code: ${status}`);
+  }
+
+  return dataObj;
+};
