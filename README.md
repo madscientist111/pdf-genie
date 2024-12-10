@@ -49,11 +49,21 @@ http://localhost:9000/2015-03-31/functions/function/invocations
 for more details - [AWS Docs](https://docs.aws.amazon.com/lambda/latest/dg/images-test.html).
 
 ### Sample Event
-If routed through AWS API Gateway,
+Regular Event,
 ```
 {
     "media_url": "<YOUR-MEDIA-URL>",
     "convert_to": "pdf OR <ANY-OTHER-SUPPORTED-FORMAT>"
+}
+```
+
+If routed through AWS API Gateway,
+```
+{
+    "headers": {
+        "Authorization": "Bearer <USER_TOKEN>"
+    },
+    "body": <JSON_STRINGIFIED_REGULAR_EVENT> (Available above)
 }
 ```
 
